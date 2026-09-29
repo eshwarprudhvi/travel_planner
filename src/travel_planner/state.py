@@ -1,11 +1,11 @@
-from typing import Literal
-from pydantic import BaseModel
+from typing import Annotated, Literal, Optional
+from typing_extensions import TypedDict
 from langchain_core.messages import AnyMessage
-from langgraph.graph import add_messages 
+from langgraph.graph.message import add_messages 
 
-class AgentState(BaseModel):
-    prompt : str
-    intent : Literal["TRAVEL", "NOT_TRAVEL"]
-    messages: list[AnyMessage, add_messages]
-    non_travel_attempts: int = 0
+class AgentState(TypedDict):
+    prompt: str
+    intent: Optional[Literal["TRAVEL", "NOT_TRAVEL"]]
+    messages: Annotated[list[AnyMessage], add_messages]
+    non_travel_attempts: int
     

@@ -21,10 +21,10 @@ class IntentOutput(BaseModel):
 
 #routers
 
-def route_to_planner_or_not(state:AgentState):
-    if state["non_travel_attempts"] >= 4:
+def route_to_planner_or_not(state: AgentState):
+    if state.get("non_travel_attempts", 0) >= 4:
         return "END"
-    elif state["intent"] == "TRAVEL":
+    elif state.get("intent") == "TRAVEL":
         return "travel_planner_workflow"
     else:
         return "not_travel_workflow"
@@ -32,7 +32,7 @@ def route_to_planner_or_not(state:AgentState):
 
 ##nodes 
 
-@traceable(run_type="chain",name="classify_intent")
+@traceable(run_type="chain", name="classify_intent")
 def classify_intent(state: AgentState):
     """
     Classifies the intent of the user's prompt as TRAVEL or NOT_TRAVEL
@@ -45,23 +45,23 @@ def classify_intent(state: AgentState):
 
     return {"intent": result.intent}
 
-@traceable(run_type="chain",name="not_travel_workflow")
-def not_travel_workflow(state:AgentState):
+@traceable(run_type="chain", name="not_travel_workflow")
+def not_travel_workflow(state: AgentState):
     
     user_message = interrupt(
         "I can only help with travel-related requests. "
         "What travel-related task can I help you with?"
     )
-    return {"messages":[
-        HumanMessage(content=user_message)
-    ],
-    "non_travel_attempts":state["non_travel_attempts"]+1,
-    "prompt":user_message
+    return {
+        "messages": [HumanMessage(content=user_message)],
+        "non_travel_attempts": state.get("non_travel_attempts", 0) + 1,
+        "prompt": user_message
     }
 
-@traceable(run_type="chain",name="travel_planner_workflow")
-def travel_planner_workflow(state:AgentState):
-    pass
+@traceable(run_type="chain", name="travel_planner_workflow")
+def travel_planner_workflow(state: AgentState):
+    print("Executing travel_planner_workflow for prompt:", state.get("prompt"))
+    return {}
     
 
 

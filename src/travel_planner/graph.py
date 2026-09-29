@@ -1,8 +1,9 @@
-from langgraph.graph import StateGraph , START, END
-from travel_planner.nodes import classify_intent, not_travel_workflow,route_to_planner_or_not , travel_planner_workflow
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import StateGraph, START, END
+from travel_planner.nodes import classify_intent, not_travel_workflow, route_to_planner_or_not, travel_planner_workflow
 from travel_planner.state import AgentState
 
-def create_graph():
+def create_graph(checkpointer=None):
     workflow = StateGraph(AgentState)
 
     workflow.add_node("classify_intent", classify_intent)
@@ -19,5 +20,10 @@ def create_graph():
             "END": END
         }
     )
-    workflow.add_edge("not_travel_workflow","classify_intent")
-    return workflow.compile()
+    workflow.add_edge("not_travel_workflow", "classify_intent")
+    workflow.add_edge("travel_planner_workflow", END)
+
+    if checkpointer is None:
+        checkpointer = MemorySaver()
+
+    return workflow.compile(checkpointer=checkpointer)
