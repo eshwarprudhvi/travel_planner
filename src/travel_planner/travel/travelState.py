@@ -2,6 +2,13 @@ from typing import Literal, Optional
 from typing_extensions import TypedDict
 
 
+from travel_planner.transport.state import RoadRouteResult
+
+
+class TransportationOptions(TypedDict, total=False):
+    road_result: Optional[RoadRouteResult]
+
+
 class TravelState(TypedDict):
     prompt: Optional[str]
     source: Optional[str]
@@ -10,9 +17,10 @@ class TravelState(TypedDict):
     number_of_days: Optional[int]
     mode_of_travel: Optional[str]    
     budget: Optional[int]
-    transportation: Optional[str]
+    transportation: Optional[TransportationOptions]
     accommodation_type: Optional[str]
     itinerary: Optional[str]
+
     
     
     

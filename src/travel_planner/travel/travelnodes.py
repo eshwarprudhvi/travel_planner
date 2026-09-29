@@ -154,3 +154,220 @@ def ask_source(state: TravelState) -> dict:
     """
     user_response = interrupt("Where will you be traveling from?")
     return {"prompt": user_response}
+
+
+# --- Date of Travel Workflow ---
+
+class DateOutput(BaseModel):
+    date_of_travel: str | None = Field(
+        default=None,
+        description="The travel date, date range, or time period mentioned by the user (e.g. 'October 15', 'next month'), or None if not mentioned"
+    )
+
+
+DATE_PROMPT = """You are an expert travel assistant. Analyze the user's travel request and extract the date of travel, date range, or time period they plan to travel.
+
+Guidelines:
+- Extract the date or time period as stated by the user (for example: "October 15", "next month", "tomorrow", "first week of December", "10th to 15th Nov").
+- Do NOT convert or normalize relative dates into concrete dates yet (e.g. keep "next month" as "next month").
+- Do NOT extract trip duration or number of days (e.g. in "I want to travel for 5 days", 5 days is the duration, not the date of travel).
+- If no date or time period is mentioned (for example, "Take me to Goa" or "I want to travel somewhere"), return null / None.
+
+User Request: {prompt}
+"""
+
+
+# routers
+def route_date(state: TravelState) -> str:
+    """
+    Examines state['date_of_travel'] and routes to:
+    - 'ask_date' if date_of_travel is missing or None
+    - 'continue' if date_of_travel exists
+    """
+    date_of_travel = state.get("date_of_travel")
+    if date_of_travel:
+        return "continue"
+    return "ask_date"
+
+
+# nodes
+@traceable(run_type="chain", name="extract_date")
+def extract_date(state: TravelState) -> dict:
+    """
+    Extracts the travel date or time period from state['prompt']
+    and updates state['date_of_travel'].
+    """
+    prompt = state.get("prompt", "") or ""
+    model_with_structured_output = gemini_llm.with_structured_output(DateOutput)
+    result: DateOutput = model_with_structured_output.invoke(
+        DATE_PROMPT.format(prompt=prompt)
+    )
+
+    return {"date_of_travel": result.date_of_travel}
+
+
+@traceable(run_type="chain", name="ask_date")
+def ask_date(state: TravelState) -> dict:
+    """
+    Prompts the user to provide their travel date when none was extracted,
+    then updates state['prompt'] with the user's response so it can be re-extracted.
+    """
+    user_response = interrupt("When would you like to travel?")
+    return {"prompt": user_response}
+
+
+# --- Number of Days Workflow ---
+
+class NumberOfDaysOutput(BaseModel):
+    number_of_days: int | None = Field(
+        default=None,
+        description="The explicitly stated number of days or trip duration as an integer, or None if not mentioned"
+    )
+
+
+NUMBER_OF_DAYS_PROMPT = """You are an expert travel assistant. Analyze the user's travel request and extract the explicitly stated duration or number of days for the trip.
+
+Guidelines:
+- Extract ONLY explicitly stated trip duration (for example: "5 day trip" -> 5, "stay for 3 days" -> 3, "2 days" -> 2, "a week" -> 7).
+- Return an integer value representing the number of days.
+- Do NOT calculate the duration by subtracting dates from a date range (for example, in "I'll travel from October 10 to October 15", do not compute 5 days; return null / None).
+- If no explicit duration or number of days is stated (for example, "Plan a trip to Goa" or "I want to visit Paris in October"), return null / None.
+
+User Request: {prompt}
+"""
+
+
+# routers
+def route_number_of_days(state: TravelState) -> str:
+    """
+    Examines state['number_of_days'] and routes to:
+    - 'ask_number_of_days' if number_of_days is missing, None, or <= 0
+    - 'continue' if number_of_days exists
+    """
+    number_of_days = state.get("number_of_days")
+    if number_of_days and number_of_days > 0:
+        return "continue"
+    return "ask_number_of_days"
+
+
+# nodes
+@traceable(run_type="chain", name="extract_number_of_days")
+def extract_number_of_days(state: TravelState) -> dict:
+    """
+    Extracts the explicitly stated trip duration in days from state['prompt']
+    and updates state['number_of_days'].
+    """
+    prompt = state.get("prompt", "") or ""
+    model_with_structured_output = gemini_llm.with_structured_output(NumberOfDaysOutput)
+    result: NumberOfDaysOutput = model_with_structured_output.invoke(
+        NUMBER_OF_DAYS_PROMPT.format(prompt=prompt)
+    )
+
+    return {"number_of_days": result.number_of_days}
+
+
+@traceable(run_type="chain", name="ask_number_of_days")
+def ask_number_of_days(state: TravelState) -> dict:
+    """
+    Prompts the user to provide the number of days when none was extracted,
+    then updates state['prompt'] with the user's response so it can be re-extracted.
+    """
+    user_response = interrupt("How many days would you like the trip to be?")
+    return {"prompt": user_response}
+
+
+# --- Budget Workflow ---
+
+class BudgetOutput(BaseModel):
+    budget: int | None = Field(
+        default=None,
+        description="The maximum or intended trip budget as an integer (e.g. ₹30,000 -> 30000, 50k -> 50000), or None if not mentioned"
+    )
+
+
+BUDGET_PROMPT = """You are an expert travel assistant. Analyze the user's travel request and extract the monetary budget they plan to spend on the trip.
+
+Guidelines:
+- Extract the monetary budget as an integer number.
+- Normalize obvious shorthand and currency symbols:
+  * "₹30,000" or "30000 rs" or "30,000" -> 30000
+  * "30k" or "30K" -> 30000
+  * "50k" or "50K" -> 50000
+  * "1 lakh" or "1L" -> 100000
+  * "$500" -> 500 (extract the numeric value 500 without converting currencies)
+- If no monetary budget is stated (for example, "Plan a trip to Goa for 5 days"), return null / None.
+
+User Request: {prompt}
+"""
+
+
+# routers
+def route_budget(state: TravelState) -> str:
+    """
+    Examines state['budget'] and routes to:
+    - 'ask_budget' if budget is missing, None, or <= 0
+    - 'continue' if budget exists
+    """
+    budget = state.get("budget")
+    if budget and budget > 0:
+        return "continue"
+    return "ask_budget"
+
+
+# nodes
+@traceable(run_type="chain", name="extract_budget")
+def extract_budget(state: TravelState) -> dict:
+    """
+    Extracts the monetary budget from state['prompt']
+    and updates state['budget'].
+    """
+    prompt = state.get("prompt", "") or ""
+    model_with_structured_output = gemini_llm.with_structured_output(BudgetOutput)
+    result: BudgetOutput = model_with_structured_output.invoke(
+        BUDGET_PROMPT.format(prompt=prompt)
+    )
+
+    return {"budget": result.budget}
+
+
+@traceable(run_type="chain", name="ask_budget")
+def ask_budget(state: TravelState) -> dict:
+    """
+    Prompts the user to provide their budget when none was extracted,
+    then updates state['prompt'] with the user's response so it can be re-extracted.
+    """
+    user_response = interrupt("What is your budget for the trip?")
+    return {"prompt": user_response}
+
+
+# --- Transportation Workflow ---
+
+@traceable(run_type="chain", name="transportation_workflow")
+def transportation_workflow(state: TravelState) -> dict:
+    """
+    Invokes the independent Transportation Subgraph using the parent state's
+    'source' and first 'destination', then saves the structured result
+    into state['transportation'].
+    """
+    from travel_planner.transport.graph import create_transport_graph
+    from travel_planner.transport.state import TransportState
+
+    source = state.get("source") or ""
+    destinations = state.get("destination", [])
+    destination = destinations[0] if destinations else ""
+
+    transport_subgraph = create_transport_graph()
+    subgraph_input: TransportState = {
+        "source": source,
+        "destination": destination,
+        "road_result": None,
+    }
+
+    subgraph_output = transport_subgraph.invoke(subgraph_input)
+    road_result = subgraph_output.get("road_result")
+
+    return {
+        "transportation": {
+            "road_result": road_result
+        }
+    }
