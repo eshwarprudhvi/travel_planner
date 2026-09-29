@@ -1,7 +1,6 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
-from config.api_keys import GEMINI_API_KEY, GROQ_API_KEY
-
+from travel_planner.config.api_keys import GEMINI_API_KEY, GROQ_API_KEY
 
 
 gemini_llm = ChatGoogleGenerativeAI(
@@ -17,6 +16,3 @@ groq_llm = ChatGroq(
     max_retries=3,
     api_key=GROQ_API_KEY
 )
-
-for chunk in gemini_llm.stream("Hello, how are you? write a 20 lines poem about the beauty of nature."):
-    print(chunk.text, end="", flush=True)
