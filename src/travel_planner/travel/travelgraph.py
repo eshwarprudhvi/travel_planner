@@ -20,6 +20,7 @@ from .travelnodes import (
     route_budget,
     ask_budget,
     transportation_workflow,
+    transportation_decision_node,
 )
 
 
@@ -51,8 +52,9 @@ def create_travel_graph(checkpointer=None):
     workflow.add_node("extract_budget", extract_budget)
     workflow.add_node("ask_budget", ask_budget)
 
-    # Transportation node
+    # Transportation nodes
     workflow.add_node("transportation_workflow", transportation_workflow)
+    workflow.add_node("transportation_decision_node", transportation_decision_node)
 
     # Destination flow
     workflow.add_edge(START, "extract_destination")
@@ -122,7 +124,8 @@ def create_travel_graph(checkpointer=None):
     workflow.add_edge("ask_budget", "extract_budget")
 
     # Transportation flow
-    workflow.add_edge("transportation_workflow", END)
+    workflow.add_edge("transportation_workflow", "transportation_decision_node")
+    workflow.add_edge("transportation_decision_node", END)
 
     if checkpointer is None:
         checkpointer = MemorySaver()

@@ -360,14 +360,47 @@ def transportation_workflow(state: TravelState) -> dict:
     subgraph_input: TransportState = {
         "source": source,
         "destination": destination,
+        "date_of_travel": state.get("date_of_travel"),
         "road_result": None,
+        "rail_result": None,
+        "result": None,
     }
 
     subgraph_output = transport_subgraph.invoke(subgraph_input)
-    road_result = subgraph_output.get("road_result")
+    transport_result = subgraph_output.get("result")
 
     return {
-        "transportation": {
-            "road_result": road_result
+        "transportation": transport_result
+    }
+
+
+@traceable(run_type="chain", name="transportation_decision_node")
+def transportation_decision_node(state: TravelState) -> dict:
+    """
+    Consumes ONLY the pre-collected factual TransportationResult in state['transportation']
+    and optional date_of_travel to invoke the Transportation Decision Agent,
+    storing the structured reasoning in state['transportation_recommendation'].
+    """
+    from travel_planner.transport.nodes.decision_agent import decide_transportation
+
+    transportation_result = state.get("transportation")
+    date_of_travel = state.get("date_of_travel")
+
+    if not transportation_result:
+        from travel_planner.transport.state import TransportationRecommendation
+        return {
+            "transportation_recommendation": TransportationRecommendation(
+                status="NO_VIABLE_OPTION",
+                primary_recommendation_reason="No transportation data was collected prior to decision agent execution.",
+                limitations=["TransportationResult was missing from TravelState."],
+            )
         }
+
+    recommendation = decide_transportation(
+        transport_result=transportation_result,
+        date_of_travel=date_of_travel,
+    )
+
+    return {
+        "transportation_recommendation": recommendation
     }

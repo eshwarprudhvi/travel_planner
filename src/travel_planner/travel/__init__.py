@@ -1,4 +1,4 @@
-from .travelState import TravelState, TransportationOptions
+from .travelState import TravelState
 from .travelgraph import create_travel_graph
 from .travelnodes import (
     DestinationOutput,
@@ -28,7 +28,6 @@ from .travelnodes import (
 
 __all__ = [
     "TravelState",
-    "TransportationOptions",
     "create_travel_graph",
     "DestinationOutput",
     "extract_destination",
